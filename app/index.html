@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nano-llm • AI Inference Engine</title>
+  
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap">
+
+  <!-- Markdown Parsing & Highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    :root {
+      --bg-base: #fbfbfa;
+      --surface-white: #ffffff;
+      --surface-elevated: #ffffff;
+      --border-subtle: #f0f0ee;
+      --border-light: #e5e7eb;
+      --border-hover: #d1d5db;
+      --border-strong: #9ca3af;
+      
+      --accent-indigo: #4f46e5;
+      --accent-indigo-hover: #4338ca;
+      --accent-indigo-soft: #eef2ff;
+      --accent-indigo-border: #c7d2fe;
+      
+      --accent-emerald: #10b981;
+      --accent-emerald-soft: #ecfdf5;
+      --accent-emerald-border: #a7f3d0;
+      --accent-emerald-text: #065f46;
+
+      --accent-amber: #f59e0b;
+      --accent-amber-soft: #fffbeb;
+
+      --text-ink: #111827;
+      --text-slate: #4b5563;
+      --text-muted: #9ca3af;
+      --text-subtle: #6b7280;
+
+      --code-bg: #0f172a;
+      --code-border: #1e293b;
+      --code-text: #e2e8f0;
+
+      --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'Space Mono', monospace;
+      --font-code: 'JetBrains Mono', monospace;
+
+      --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+      --shadow-md: 0 4px 16px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+      --shadow-dock: 0 16px 40px -6px rgba(0, 0, 0, 0.1), 0 0 1px 1px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-ink);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-image: radial-gradient(#e5e7eb 1.25px, transparent 1.25px);
+      background-size: 24px 24px;
+      position: relative;
+    }
+
+    /* Fixed Application Header */
+    header {
+      width: 100%;
+      max-width: 860px;
+      padding: 1.1rem 1.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(251, 251, 250, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-light);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 0.95rem;
+    }
+
+    .logo-container {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-indigo), #818cf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
+      flex-shrink: 0;
+    }
+
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .brand-name {
+      font-size: 1.32rem;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      color: var(--text-ink);
+      line-height: 1;
+    }
+
+    .version-tag {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--accent-indigo);
+      background: var(--accent-indigo-soft);
+      padding: 0.18rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--accent-indigo-border);
+      letter-spacing: 0.02em;
+    }
+
+    .creator-line {
+      font-size: 0.8rem;
+      color: var(--text-slate);
+      line-height: 1.2;
+    }
+
+    .creator-bold {
+      color: var(--text-ink);
+      font-weight: 700;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      padding: 0.38rem 0.8rem;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-slate);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+    }
+
+    .clear-btn {
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      padding: 0.38rem 0.75rem;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-slate);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .clear-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text-ink);
+      background: #f9fafb;
+    }
+
+    /* Main Conversation View */
+    main {
+      width: 100%;
+      max-width: 860px;
+      flex: 1;
+      padding: 2.25rem 1.75rem 8.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
+
+    /* Empty Greeting Hero State */
+    .empty-state {
+      margin: auto 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 1.65rem;
+      padding: 2.5rem 1rem 1rem;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--accent-emerald-soft);
+      border: 1px solid var(--accent-emerald-border);
+      color: var(--accent-emerald-text);
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 0.32rem 0.85rem;
+      border-radius: 999px;
+    }
+
+    .hero-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      color: var(--text-ink);
+      max-width: 540px;
+      line-height: 1.24;
+    }
+
+    .hero-desc {
+      font-size: 0.96rem;
+      color: var(--text-slate);
+      max-width: 510px;
+      line-height: 1.62;
+    }
+
+    .preset-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      width: 100%;
+      max-width: 520px;
+      margin-top: 0.5rem;
+    }
+
+    .preset-card {
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      padding: 0.95rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-ink);
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .preset-card:hover {
+      border-color: var(--accent-indigo);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      color: var(--accent-indigo);
+    }
+
+    .preset-arrow {
+      color: var(--accent-indigo);
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    /* Message Bubbles & Layout */
+    .chat-row {
+      display: flex;
+      width: 100%;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-row.user {
+      justify-content: flex-end;
+    }
+
+    .chat-row.ai {
+      justify-content: flex-start;
+    }
+
+    .message-card {
+      max-width: 86%;
+      border-radius: 18px;
+      padding: 1.15rem 1.45rem;
+      font-size: 0.96rem;
+      line-height: 1.68;
+      box-shadow: var(--shadow-sm);
+      word-break: break-word;
+      position: relative;
+    }
+
+    .user .message-card {
+      background: var(--accent-indigo);
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .ai .message-card {
+      background: var(--surface-white);
+      border: 1px solid var(--border-light);
+      border-bottom-left-radius: 4px;
+      color: var(--text-ink);
+    }
+
+    /* Markdown Formatting inside AI responses */
+    .ai .message-card .markdown-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .ai .message-card p {
+      margin: 0;
+    }
+
+    .ai .message-card pre {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      color: var(--code-text);
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      font-family: var(--font-code);
+      font-size: 0.88rem;
+      overflow-x: auto;
+      margin: 0.65rem 0;
+      line-height: 1.55;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .ai .message-card code {
+      font-family: var(--font-code);
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 0.15rem 0.4rem;
+      border-radius: 5px;
+      font-size: 0.88rem;
+      font-weight: 500;
+    }
+
+    .ai .message-card pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      font-weight: 400;
+    }
+
+    .ai .message-card ul, .ai .message-card ol {
+      margin-left: 1.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .ai .message-card strong {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    /* Thinking Equalizer Animation */
+    .thinking-visual {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0.45rem 0.25rem;
+      height: 32px;
+    }
+
+    .pulse-bar {
+      width: 5px;
+      height: 18px;
+      background: var(--accent-indigo);
+      border-radius: 3px;
+      animation: equalizer 1s infinite ease-in-out;
+    }
+
+    .pulse-bar:nth-child(1) { animation-delay: 0.0s; height: 16px; }
+    .pulse-bar:nth-child(2) { animation-delay: 0.15s; height: 26px; }
+    .pulse-bar:nth-child(3) { animation-delay: 0.3s; height: 14px; }
+    .pulse-bar:nth-child(4) { animation-delay: 0.45s; height: 22px; }
+
+    @keyframes equalizer {
+      0%, 100% { transform: scaleY(0.35); opacity: 0.4; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    .cursor-caret {
+      display: inline-block;
+      width: 3px;
+      height: 1.15em;
+      background: var(--accent-indigo);
+      margin-left: 3px;
+      vertical-align: text-bottom;
+      animation: blink 0.85s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Telemetry Diagnostics Row */
+    .response-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 0.95rem;
+      margin-top: 0.85rem;
+      padding-top: 0.65rem;
+      border-top: 1px dashed var(--border-light);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      color: var(--text-slate);
+    }
+
+    .telemetry-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    /* Floating Command Dock */
+    .floating-dock {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      max-width: 860px;
+      padding: 1.25rem 1.75rem 1.75rem;
+      background: linear-gradient(to top, var(--bg-base) 80%, rgba(251, 251, 250, 0));
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .dock-form {
+      pointer-events: auto;
+      background: var(--surface-white);
+      border: 1.5px solid var(--border-light);
+      border-radius: 18px;
+      padding: 0.65rem 0.85rem 0.65rem 1.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      box-shadow: var(--shadow-dock);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .dock-form:focus-within {
+      border-color: var(--accent-indigo);
+      box-shadow: 0 16px 44px -4px rgba(79, 70, 229, 0.16), 0 0 1px 1px rgba(79, 70, 229, 0.1);
+    }
+
+    .dock-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      font-size: 0.96rem;
+      font-family: var(--font-body);
+      color: var(--text-ink);
+    }
+
+    .dock-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .send-trigger {
+      background: var(--accent-indigo);
+      color: #ffffff;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .send-trigger:hover:not(:disabled) {
+      background: var(--accent-indigo-hover);
+      transform: scale(1.04);
+    }
+
+    .send-trigger:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .send-trigger:disabled {
+      background: #e5e7eb;
+      color: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Modal / Inspector Drawer */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.45);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .modal-card {
+      background: var(--surface-white);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 540px;
+      border: 1px solid var(--border-light);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalPop {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.25rem;
+      color: var(--text-slate);
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      font-size: 0.92rem;
+      color: var(--text-slate);
+      line-height: 1.6;
+    }
+
+    @media (max-width: 680px) {
+      header { padding: 1rem 1.25rem; }
+      main { padding: 1.25rem 1rem 7.5rem; }
+      .message-card { max-width: 92%; padding: 1rem 1.15rem; }
+      .status-badge { display: none; }
+      .floating-dock { padding: 1rem 1rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header>
+    <div class="brand-cluster">
+      <div class="logo-container" aria-label="nano-llm logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 3v3m0 12v3"></path>
+          <path d="M3 12h3m12 0h3"></path>
+          <circle cx="12" cy="3" r="1.5" fill="#ffffff"></circle>
+          <circle cx="12" cy="21" r="1.5" fill="#ffffff"></circle>
+          <circle cx="3" cy="12" r="1.5" fill="#ffffff"></circle>
+          <circle cx="21" cy="12" r="1.5" fill="#ffffff"></circle>
+        </svg>
+      </div>
+
+      <div class="brand-meta">
+        <div class="title-row">
+          <h1 class="brand-name">nano-llm</h1>
+          <span class="version-tag">KV-CACHE • INT8</span>
+        </div>
+        <p class="creator-line">Engineered from scratch by <span class="creator-bold">Vivek Dangwal</span></p>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <button class="clear-btn" onclick="resetConversation()" title="Clear dialogue history">Clear Chat</button>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span>135M • Pure CPU Active</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Central Canvas -->
+  <main id="conversationCanvas">
+    <div class="empty-state" id="emptyGreeting">
+      <span class="hero-badge">Zero API Dependencies • Runs on CPU</span>
+      <h2 class="hero-title">Experience Custom Autoregressive Inference</h2>
+      <p class="hero-desc">
+        Interact with an open 135M model running on raw PyTorch with custom key-value caching and manual 8-bit integer quantization.
+      </p>
+
+      <div class="preset-group">
+        <div class="preset-card" onclick="runPreset('Write a Python function to reverse a string and test it.')">
+          <span>Write a Python function to reverse a string</span>
+          <span class="preset-arrow">→</span>
+        </div>
+        <div class="preset-card" onclick="runPreset('Explain how your custom KV-cache achieves a 2.4x speedup.')">
+          <span>Explain how your custom KV-cache achieves a 2.4x speedup</span>
+          <span class="preset-arrow">→</span>
+        </div>
+        <div class="preset-card" onclick="runPreset('How does INT8 quantization reduce memory by 59% without crashing accuracy?')">
+          <span>How INT8 quantization saves 59% memory footprint</span>
+          <span class="preset-arrow">→</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Input Dock -->
+  <div class="floating-dock">
+    <form class="dock-form" onsubmit="executeChat(event)">
+      <input 
+        type="text" 
+        id="promptInputField" 
+        class="dock-input" 
+        placeholder="Ask for code, explanations, or questions..." 
+        autocomplete="off"
+      />
+      <button type="submit" id="sendTriggerBtn" class="send-trigger" aria-label="Send Prompt">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"></line>
+          <polyline points="5 12 12 5 19 12"></polyline>
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <!-- Telemetry Details Modal -->
+  <div class="modal-overlay" id="telemetryModal" onclick="closeModal(event)">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Engine Profiler</h3>
+        <button class="modal-close" onclick="toggleModal(false)">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Architecture:</strong> Custom CausalLM Transformer</p>
+        <p><strong>Weight Resolution:</strong> INT8 Symmetric Per-Tensor Quantized</p>
+        <p><strong>KV Cache:</strong> Multi-Head Key/Value concatenation across past tokens</p>
+        <p><strong>Context Budget:</strong> Sliding turn window with ChatML generation prompts</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("conversationCanvas");
+    const inputField = document.getElementById("promptInputField");
+    const sendBtn = document.getElementById("sendTriggerBtn");
+    const greeting = document.getElementById("emptyGreeting");
+    const modal = document.getElementById("telemetryModal");
+
+    // Retained conversational state
+    let conversationHistory = [];
+
+    // Markdown Parser Settings
+    marked.setOptions({
+      breaks: true,
+      gfm: true
+    });
+
+    function resetConversation() {
+      conversationHistory = [];
+      canvas.innerHTML = "";
+      if (greeting) {
+        canvas.appendChild(greeting);
+        greeting.style.display = "flex";
+      }
+      inputField.value = "";
+      inputField.focus();
+    }
+
+    function runPreset(text) {
+      inputField.value = text;
+      executeChat(new Event("submit"));
+    }
+
+    function toggleModal(show) {
+      modal.style.display = show ? "flex" : "none";
+    }
+
+    function closeModal(e) {
+      if (e.target === modal) toggleModal(false);
+    }
+
+    async function executeChat(e) {
+      e.preventDefault();
+      const prompt = inputField.value.trim();
+      if (!prompt) return;
+
+      if (greeting) greeting.style.display = "none";
+
+      // 1. User Message
+      conversationHistory.push({ role: "user", content: prompt });
+      renderUserMessage(prompt);
+      inputField.value = "";
+      sendBtn.disabled = true;
+
+      // 2. AI Skeleton Container
+      const { card, contentDiv } = renderAiContainer();
+      contentDiv.innerHTML = `
+        <div class="thinking-visual" aria-label="Generating Response">
+          <div class="pulse-bar"></div>
+          <div class="pulse-bar"></div>
+          <div class="pulse-bar"></div>
+          <div class="pulse-bar"></div>
+        </div>
+      `;
+      autoScroll();
+
+      const startTime = performance.now();
+      let isFirstToken = true;
+      let streamedTokens = "";
+      let tokenCount = 0;
+
+      try {
+        const response = await fetch("/generate/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            messages: conversationHistory, 
+            max_tokens: 512 
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+
+          if (isFirstToken) {
+            contentDiv.innerHTML = "";
+            isFirstToken = false;
+          }
+
+          streamedTokens += chunk;
+          tokenCount += 1;
+
+          contentDiv.innerHTML = marked.parse(streamedTokens);
+
+          const caret = document.createElement("span");
+          caret.className = "cursor-caret";
+          contentDiv.appendChild(caret);
+          autoScroll();
+        }
+
+        conversationHistory.push({ role: "assistant", content: streamedTokens });
+
+        // Telemetry diagnostics
+        const elapsedSec = (performance.now() - startTime) / 1000;
+        const speed = (tokenCount / Math.max(elapsedSec, 0.01)).toFixed(1);
+        
+        const telemetry = document.createElement("div");
+        telemetry.className = "response-telemetry";
+        telemetry.innerHTML = `
+          <div class="telemetry-item">⚡ ${speed} tok/s</div>
+          <div class="telemetry-item">⏱️ ${elapsedSec.toFixed(2)}s</div>
+          <div class="telemetry-item">📦 INT8 Quantized</div>
+        `;
+        card.appendChild(telemetry);
+
+      } catch (err) {
+        contentDiv.innerHTML = `<span style="color: #ef4444; font-weight: 500;">Connection interrupted: Make sure your local server is running at 127.0.0.1:8000.</span>`;
+      } finally {
+        const activeCaret = contentDiv.querySelector(".cursor-caret");
+        if (activeCaret) activeCaret.remove();
+        sendBtn.disabled = false;
+        inputField.focus();
+        autoScroll();
+      }
+    }
+
+    function renderUserMessage(text) {
+      const row = document.createElement("div");
+      row.className = "chat-row user";
+      const card = document.createElement("div");
+      card.className = "message-card";
+      card.textContent = text;
+      row.appendChild(card);
+      canvas.appendChild(row);
+      autoScroll();
+    }
+
+    function renderAiContainer() {
+      const row = document.createElement("div");
+      row.className = "chat-row ai";
+      const card = document.createElement("div");
+      card.className = "message-card";
+      
+      const contentDiv = document.createElement("div");
+      contentDiv.className = "markdown-content";
+      card.appendChild(contentDiv);
+      
+      row.appendChild(card);
+      canvas.appendChild(row);
+      return { card, contentDiv };
+    }
+
+    function autoScroll() {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth"
+      });
+    }
+  </script>
+</body>
+</html>
