@@ -1,25 +1,11 @@
 """
 Mini LLM Inference Engine -- core.py
 
-NEW in this version: officeholder detection now handles more phrasings.
-Previously only "president of India" style (office THEN entity) matched.
-Now also handles:
-  - possessive form: "India's current president" (entity THEN office)
-  - multiple offices in one question: "India's current PM and president"
-    resolves BOTH facts via Wikidata, not just the first one matched.
-
-Full changelog (earlier fixes, still included):
-1. Repetition penalty only tracks tokens generated in THIS response.
-2. System prompt added to anchor behavior and reduce topic drift.
-3. Per-channel INT8 quantization instead of per-tensor.
-4. Fixed a dead stop-token string check.
-5. Swapped SmolLM2-135M -> Qwen2.5-0.5B-Instruct.
-6. Lightweight Wikipedia fact-lookup (free, no key), skipped for greetings.
-7. Forces PyTorch to use all available CPU threads.
-8. torch.inference_mode(), trimmed default max_new_tokens.
-9. Debug timing prints for retrieval / prefill / decode speed.
-10. Wikidata officeholder resolution for "current president/PM/CEO" style
-    questions, now handling both phrasing orders and multi-office queries.
+Optimized for low-memory deployment (under 512MB RAM ceiling):
+- Switched base model to SmolLM2-135M-Instruct to prevent container OOM kills.
+- Per-channel symmetric INT8 quantization for linear projection layers.
+- Real-time key-value caching during autoregressive decoding.
+- Retrieval-augmented context grounding via Wikidata/Wikipedia APIs.
 """
 
 import os
@@ -31,7 +17,7 @@ import requests
 from typing import Generator, List, Dict, Optional, Tuple
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
+MODEL_ID = "HuggingFaceTB/SmolLM2-135M-Instruct"
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are a helpful, direct assistant. Answer only the question the user just asked, "
@@ -84,12 +70,6 @@ def _should_attempt_retrieval(query: str) -> bool:
 
 
 def _detect_officeholder_queries(query: str) -> List[Tuple[str, str, str]]:
-    """
-    Returns a list of (property_id, office_label, entity_name) for every
-    recognized office mentioned in the query -- so a question like
-    "India's current PM and president" resolves BOTH facts, not just one.
-    Returns an empty list if no entity name could be confidently found.
-    """
     entity_name = None
     m = _ENTITY_PATTERN_OF.search(query)
     if m:
@@ -118,7 +98,6 @@ def _detect_officeholder_queries(query: str) -> List[Tuple[str, str, str]]:
 
 
 def fetch_wikidata_officeholder(entity_name: str, property_id: str) -> Optional[str]:
-    """Resolves one 'who currently holds position X for Y' fact via Wikidata."""
     try:
         search_resp = requests.get(
             WIKIDATA_API,
@@ -183,7 +162,6 @@ def fetch_wikidata_officeholder(entity_name: str, property_id: str) -> Optional[
 
 
 def fetch_wikipedia_context(query: str, max_chars: int = 500) -> Optional[str]:
-    """Free, no-key Wikipedia lookup -- combined search+summary in one request."""
     try:
         resp = requests.get(
             WIKIPEDIA_API,
@@ -211,7 +189,7 @@ def fetch_wikipedia_context(query: str, max_chars: int = 500) -> Optional[str]:
 
 
 class QuantizedLinear(nn.Module):
-    """Per-CHANNEL symmetric INT8 linear layer (own scale per output neuron)."""
+    """Per-channel symmetric INT8 linear layer."""
     def __init__(self, original_linear: nn.Linear):
         super().__init__()
         self.in_features = original_linear.in_features
@@ -276,7 +254,7 @@ class MiniLLMEngine:
         self._log("Loading base weights into RAM...")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
-            dtype=torch.float32,
+            torch_dtype=torch.float32,
             low_cpu_mem_usage=True,
         )
 
@@ -376,7 +354,6 @@ class MiniLLMEngine:
                       f"({len(facts)}/{len(officeholder_queries)} resolved)")
             if facts:
                 return " ".join(facts) + " (Source: Wikidata)"
-            # none resolved -- fall through to Wikipedia text lookup below
 
         if _should_attempt_retrieval(last_user_msg):
             t0 = time.time()
